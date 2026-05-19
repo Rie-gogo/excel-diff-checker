@@ -1,0 +1,35 @@
+{
+  "build_command": "pnpm run build",
+  "capabilities": [],
+  "dev_command": "pnpm run dev",
+  "env_vars": {},
+  "experiments": null,
+  "git_remote": {
+    "repo_url": "s3://vida-prod-gitrepo/webdev-git/310519663470568130/C5sxtQnZ2JEoJrJcJ5yi8M",
+    "access_key_id": "ASIAZV3A2ECZHQXXNIS5",
+    "secret_access_key": "KZXUNYsVnAa7ksGUuIauf23ov8rP6+AFTMwI21A5",
+    "session_token": "IQoJb3JpZ2luX2VjEAMaCXVzLWVhc3QtMSJGMEQCIFUNHOCuOl3JaGD8cJaEVo3XMAgmBLjydlRNIDQw5y7GAiB77oitcyEcoXuuPhgk4tvcwPChUsRyCVWRYUCpDFil2ir/AwjL//////////8BEAQaDDY2NTM4NjA5ODg2NiIMqZD8SOJuRfZKyAmlKtMDZfmcYyUyAb+oirxO7p0k5jAKwGrhj/RPcg+4TPtepaf9Y5JQna8EOtjLs5vBa4tB7+tpFVsMWwhyMzTfQNREGiSk97vASqyjdkz0vbj/nv1A+ZLROIyYYM7WEtHYrtDulJajXbBR0GCEGHJXFQDarWE8FnUDdFlL4XHzFR/1/nGirFJlmaZ0XH6waRPoF26EJNEp+8BCwyGzEGoIP6jz4aN1jmxNUsVadT+32ZLO1lSrCbJAP6kGP/65H4H7YBkupvImC1uw/idjP7E9uaW0YYNuNEZ3bX1DkQauisYtOO0vBlwHnCb+PfppsQOE3CwS93Ms078ehCrESnzD0EJ2b/ePBb/uxiHiMchpQrfWI97tou2tIGKmtbUV34Cy5yylXYGFk1O1W+JTSc6V4EYs94QX+Mlvkwg8Dcmb9myzyZg4NPegd9xtWW6/86ulcB7x3dZmVuP44l+7qWERCX2RsFbViP5oZw0e/f7IalS64QT/evQ6ZzA2Nbfk4q6GPypSkph2x8of8uECVwlGF7vuVw8pRbXKIppsEPXR5ArDa6l6HtL5I7McbItYuWC4lT2HNtJ8n7pbwvHa1gt7TyPsWA1Ie1pH5z8KVdcrGujxC+l1Go8wtZCv0AY6ngG+g1GOorXyO9IHsAcTbf3/dtdGhdNF28x2phK9AwlrQvX0jzw1asLCrnOGbuDbl2/YGG7YqM+vFa86/QdMy5QwVT1DNdod+KZlPwPWRZGK0UHVWFR9G4tDs5f5aidghBls3wHqpQ5W3hIH0KPYoP13In4U62W3HydHF9eZESlpjtNyrO+f13JGC+n36bra/hxdgfWoaxBUlPADJMtCgw==",
+    "expiration": "2026-05-19T14:17:25.000Z"
+  },
+  "name": "excel-diff-checker",
+  "path": "/home/ubuntu/excel-diff-checker",
+  "port": 3000,
+  "secrets": {
+    "BUILT_IN_FORGE_API_KEY": "Qh6BkFkwr7HYnkEmmSrHDg",
+    "BUILT_IN_FORGE_API_URL": "https://forge.manus.ai",
+    "JWT_SECRET": "JJa7otQYFEwtwAmbZR2vf7",
+    "OAUTH_SERVER_URL": "https://api.manus.im",
+    "OWNER_NAME": "理絵 五島",
+    "OWNER_OPEN_ID": "NbDNhnTAKGWWBwNmW8Ve5s",
+    "VITE_ANALYTICS_ENDPOINT": "https://manus-analytics.com",
+    "VITE_ANALYTICS_WEBSITE_ID": "36458158-3b71-42b4-b04a-0ec4dd018df6",
+    "VITE_APP_ID": "C5sxtQnZ2JEoJrJcJ5yi8M",
+    "VITE_APP_LOGO": "",
+    "VITE_APP_TITLE": "Excel差分チェッカー",
+    "VITE_FRONTEND_FORGE_API_KEY": "ie9htxnuqKsFLhqLtn2adW",
+    "VITE_FRONTEND_FORGE_API_URL": "https://forge.manus.ai",
+    "VITE_OAUTH_PORTAL_URL": "https://manus.im"
+  },
+  "template_id": "web-static",
+  "test_command": "pnpm test"
+}
