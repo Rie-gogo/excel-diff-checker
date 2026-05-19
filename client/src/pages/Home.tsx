@@ -337,13 +337,17 @@ function MappingRow({
 function DiffTable({
   result,
   showOnlyDiffs,
+  hideDeleted,
 }: {
   result: DiffResult;
   showOnlyDiffs: boolean;
+  hideDeleted: boolean;
 }) {
-  const displayRows = showOnlyDiffs
-    ? result.rows.filter((r) => r.status !== "same")
-    : result.rows;
+  const displayRows = result.rows.filter((r) => {
+    if (showOnlyDiffs && r.status === "same") return false;
+    if (hideDeleted && r.status === "deleted") return false;
+    return true;
+  });
 
   const keyLabels = result.keyMappings.map((km) => km.colA);
   // 比較列のみ（キー列を除く）
@@ -552,6 +556,7 @@ export default function Home() {
 
   const [diffResult, setDiffResult] = useState<DiffResult | null>(null);
   const [showOnlyDiffs, setShowOnlyDiffs] = useState(false);
+  const [hideDeleted, setHideDeleted] = useState(false);
   const [comparing, setComparing] = useState(false);
 
   // ファイル読み込み
@@ -1018,21 +1023,36 @@ export default function Home() {
 
               {/* コントロールバー */}
               <div className="flex items-center justify-between mb-4 gap-4">
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <div
-                      onClick={() => setShowOnlyDiffs(!showOnlyDiffs)}
-                      className={`w-9 h-5 rounded-full transition-colors duration-200 relative ${showOnlyDiffs ? "bg-primary" : "bg-muted"}`}
-                    >
-                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${showOnlyDiffs ? "translate-x-4" : "translate-x-0.5"}`} />
-                    </div>
-                    <span className="text-sm text-foreground/70">差分のみ表示</span>
-                  </label>
-                  <span className="text-xs text-muted-foreground">
-                    {showOnlyDiffs
-                      ? `${diffResult.rows.filter((r) => r.status !== "same").length} 行`
-                      : `${diffResult.rows.length} 行`}
-                  </span>
+                 <div className="flex items-center gap-4">
+                   <label className="flex items-center gap-2 cursor-pointer select-none">
+                     <div
+                       onClick={() => setShowOnlyDiffs(!showOnlyDiffs)}
+                       className={`w-9 h-5 rounded-full transition-colors duration-200 relative ${showOnlyDiffs ? "bg-primary" : "bg-muted"}`}
+                     >
+                       <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${showOnlyDiffs ? "translate-x-4" : "translate-x-0.5"}`} />
+                     </div>
+                     <span className="text-sm text-foreground/70">差分のみ表示</span>
+                   </label>
+                   <div className="w-px h-4 bg-border" />
+                   <label className="flex items-center gap-2 cursor-pointer select-none">
+                     <div
+                       onClick={() => setHideDeleted(!hideDeleted)}
+                       className={`w-9 h-5 rounded-full transition-colors duration-200 relative ${hideDeleted ? "bg-rose-500" : "bg-muted"}`}
+                     >
+                       <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${hideDeleted ? "translate-x-4" : "translate-x-0.5"}`} />
+                     </div>
+                     <span className="text-sm text-foreground/70">削除行を非表示</span>
+                   </label>
+                   <span className="text-xs text-muted-foreground">
+                     {(() => {
+                       const count = diffResult.rows.filter((r) => {
+                         if (showOnlyDiffs && r.status === "same") return false;
+                         if (hideDeleted && r.status === "deleted") return false;
+                         return true;
+                       }).length;
+                       return `${count} 行表示`;
+                     })()}
+                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5">
@@ -1053,7 +1073,7 @@ export default function Home() {
               </div>
 
               <div className="rounded-lg border border-border overflow-hidden shadow-sm">
-                <DiffTable result={diffResult} showOnlyDiffs={showOnlyDiffs} />
+                <DiffTable result={diffResult} showOnlyDiffs={showOnlyDiffs} hideDeleted={hideDeleted} />
               </div>
             </div>
           )}
