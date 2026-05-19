@@ -36,6 +36,9 @@ jobs:
       - name: Build for GitHub Pages
         run: pnpm exec vite build --config vite.config.pages.ts
 
+      - name: Copy index.html to 404.html for SPA routing
+        run: cp dist/public/index.html dist/public/404.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
