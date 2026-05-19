@@ -1,9 +1,18 @@
 /**
  * Excel差分比較ユーティリティ
- * Design: Precision Lab — Swiss Typography × Industrial Precision
+ * Design: "Precision Lab" — Swiss Typography × Industrial Precision
+ *
+ * 機能:
+ * - 列マッピング: ファイルA・Bの列を任意にペアリング
+ * - キーマッピング: キー列もA・B間でマッピング指定
+ * - 正規化比較: 半角/全角同一視、スペース（半角・全角）無視
  */
 
 import * as XLSX from "xlsx";
+
+// ============================
+// 型定義
+// ============================
 
 export interface SheetData {
   headers: string[];
@@ -11,10 +20,32 @@ export interface SheetData {
   sheetNames: string[];
 }
 
+/**
+ * 列マッピング: colA（ファイルAの列名）と colB（ファイルBの列名）のペア
+ */
+export interface ColumnMapping {
+  colA: string;
+  colB: string;
+  /** 表示ラベル（省略時は colA を使用） */
+  label?: string;
+}
+
+/**
+ * キーマッピング: キーとなる列のA・Bペア
+ */
+export interface KeyMapping {
+  colA: string;
+  colB: string;
+}
+
 export interface DiffCell {
+  /** 表示列名（ColumnMappingのlabel or colA） */
   col: string;
   valueA: string;
   valueB: string;
+  /** 正規化後の値（デバッグ用） */
+  normalizedA: string;
+  normalizedB: string;
 }
 
 export interface DiffRow {
@@ -26,6 +57,7 @@ export interface DiffRow {
 }
 
 export interface DiffResult {
+  /** 表示用ヘッダー（ColumnMappingのlabel or colA） */
   headers: string[];
   rows: DiffRow[];
   stats: {
@@ -35,11 +67,46 @@ export interface DiffResult {
     deleted: number;
     same: number;
   };
+  /** 使用したキーマッピング */
+  keyMappings: KeyMapping[];
+  /** 使用した列マッピング */
+  columnMappings: ColumnMapping[];
+}
+
+// ============================
+// 正規化処理
+// ============================
+
+/**
+ * 全角→半角変換テーブル（英数字・記号・スペース）
+ */
+function toHalfWidth(str: string): string {
+  return str
+    // 全角英数字・記号 → 半角
+    .replace(/[\uFF01-\uFF5E]/g, (ch) =>
+      String.fromCharCode(ch.charCodeAt(0) - 0xFF01 + 0x21)
+    )
+    // 全角スペース → 半角スペース
+    .replace(/\u3000/g, " ");
 }
 
 /**
- * ArrayBufferからExcelデータを読み込む
+ * 比較用の正規化:
+ * 1. 全角→半角変換
+ * 2. スペース（半角・全角）を除去
+ * 3. 大文字→小文字（オプション: 現在は保持）
  */
+export function normalize(value: string): string {
+  if (!value) return "";
+  const half = toHalfWidth(value.trim());
+  // スペースをすべて除去（半角スペースは toHalfWidth 後に除去）
+  return half.replace(/\s+/g, "");
+}
+
+// ============================
+// Excel読み込み
+// ============================
+
 export function parseExcel(buffer: ArrayBuffer, sheetIndex = 0): SheetData {
   const workbook = XLSX.read(buffer, { type: "array", cellText: true, cellDates: true });
   const sheetNames = workbook.SheetNames;
@@ -50,7 +117,6 @@ export function parseExcel(buffer: ArrayBuffer, sheetIndex = 0): SheetData {
     return { headers: [], rows: [], sheetNames };
   }
 
-  // ヘッダー行を含む全データをJSON化
   const rawData = XLSX.utils.sheet_to_json(worksheet, {
     header: 1,
     defval: "",
@@ -66,7 +132,6 @@ export function parseExcel(buffer: ArrayBuffer, sheetIndex = 0): SheetData {
 
   for (let i = 1; i < rawData.length; i++) {
     const rawRow = rawData[i] as string[];
-    // 全列が空の行はスキップ
     if (rawRow.every((v) => v === "" || v === null || v === undefined)) continue;
     const row: Record<string, string> = {};
     headers.forEach((h, idx) => {
@@ -78,42 +143,99 @@ export function parseExcel(buffer: ArrayBuffer, sheetIndex = 0): SheetData {
   return { headers, rows, sheetNames };
 }
 
+// ============================
+// 列マッピングのデフォルト生成
+// ============================
+
 /**
- * 2つのシートデータを比較してDiffResultを返す
+ * 2つのヘッダーリストから、名前が一致する列のデフォルトマッピングを生成する
+ * （正規化した名前で比較）
+ */
+export function buildDefaultColumnMappings(
+  headersA: string[],
+  headersB: string[]
+): ColumnMapping[] {
+  const mappings: ColumnMapping[] = [];
+  const usedB = new Set<string>();
+
+  for (const colA of headersA) {
+    const normA = normalize(colA);
+    // Bの中で正規化後が一致する列を探す
+    const matchB = headersB.find(
+      (b) => !usedB.has(b) && normalize(b) === normA
+    );
+    if (matchB) {
+      mappings.push({ colA, colB: matchB, label: colA });
+      usedB.add(matchB);
+    }
+  }
+  return mappings;
+}
+
+/**
+ * デフォルトのキーマッピングを生成（最初の共通列）
+ */
+export function buildDefaultKeyMappings(
+  headersA: string[],
+  headersB: string[]
+): KeyMapping[] {
+  const defaultMappings = buildDefaultColumnMappings(headersA, headersB);
+  return defaultMappings.length > 0
+    ? [{ colA: defaultMappings[0].colA, colB: defaultMappings[0].colB }]
+    : [];
+}
+
+// ============================
+// 差分比較
+// ============================
+
+/**
+ * 2つのシートデータを列マッピング・キーマッピングを使って比較する
  */
 export function compareSheets(
   dataA: SheetData,
   dataB: SheetData,
-  keyColumns: string[]
+  keyMappings: KeyMapping[],
+  columnMappings: ColumnMapping[]
 ): DiffResult {
-  // 全ヘッダーを結合（A優先、Bにしかないものを追加）
-  const allHeaders = [...dataA.headers];
-  for (const h of dataB.headers) {
-    if (!allHeaders.includes(h)) allHeaders.push(h);
-  }
+  // 表示ヘッダー（キー列 + 比較列）
+  const keyLabels = keyMappings.map((km) => km.colA);
+  const compareLabels = columnMappings
+    .filter((cm) => !keyMappings.some((km) => km.colA === cm.colA))
+    .map((cm) => cm.label ?? cm.colA);
+  const allHeaders = [...keyLabels, ...compareLabels];
 
-  // キーを生成する関数
-  const makeKey = (row: Record<string, string>) =>
-    keyColumns.map((k) => row[k] ?? "").join("\0");
+  // キー生成関数
+  const makeKeyA = (row: Record<string, string>) =>
+    keyMappings.map((km) => normalize(row[km.colA] ?? "")).join("\0");
+  const makeKeyB = (row: Record<string, string>) =>
+    keyMappings.map((km) => normalize(row[km.colB] ?? "")).join("\0");
 
-  // Aのマップ
+  // マップ構築
   const mapA = new Map<string, Record<string, string>>();
   for (const row of dataA.rows) {
-    const key = makeKey(row);
-    mapA.set(key, row);
+    const key = makeKeyA(row);
+    if (key.replace(/\0/g, "") !== "") mapA.set(key, row);
   }
 
-  // Bのマップ
   const mapB = new Map<string, Record<string, string>>();
   for (const row of dataB.rows) {
-    const key = makeKey(row);
-    mapB.set(key, row);
+    const key = makeKeyB(row);
+    if (key.replace(/\0/g, "") !== "") mapB.set(key, row);
   }
 
-  const allKeys = new Set<string>([...Array.from(mapA.keys()), ...Array.from(mapB.keys())]);
-  const diffRows: DiffRow[] = [];
+  const allKeys = new Set<string>([
+    ...Array.from(mapA.keys()),
+    ...Array.from(mapB.keys()),
+  ]);
 
+  const diffRows: DiffRow[] = [];
   const stats = { total: 0, modified: 0, added: 0, deleted: 0, same: 0 };
+
+  // 比較列マッピング（キー列を除く）
+  const compareMappings = columnMappings.filter(
+    (cm) => !keyMappings.some((km) => km.colA === cm.colA)
+  );
 
   for (const key of Array.from(allKeys)) {
     const rowA = mapA.get(key) ?? null;
@@ -121,22 +243,26 @@ export function compareSheets(
     stats.total++;
 
     if (rowA === null) {
-      // Bにしかない行（追加）
       diffRows.push({ key, rowA: null, rowB, diffs: [], status: "added" });
       stats.added++;
     } else if (rowB === null) {
-      // Aにしかない行（削除）
       diffRows.push({ key, rowA, rowB: null, diffs: [], status: "deleted" });
       stats.deleted++;
     } else {
-      // 両方にある行 → セルレベルで比較
       const diffs: DiffCell[] = [];
-      for (const col of allHeaders) {
-        if (keyColumns.includes(col)) continue; // キー列は比較しない
-        const va = rowA[col] ?? "";
-        const vb = rowB[col] ?? "";
-        if (va !== vb) {
-          diffs.push({ col, valueA: va, valueB: vb });
+      for (const cm of compareMappings) {
+        const va = rowA[cm.colA] ?? "";
+        const vb = rowB[cm.colB] ?? "";
+        const na = normalize(va);
+        const nb = normalize(vb);
+        if (na !== nb) {
+          diffs.push({
+            col: cm.label ?? cm.colA,
+            valueA: va,
+            valueB: vb,
+            normalizedA: na,
+            normalizedB: nb,
+          });
         }
       }
       if (diffs.length > 0) {
@@ -149,60 +275,86 @@ export function compareSheets(
     }
   }
 
-  // キー順にソート（元の順序を維持するためAの順序を優先）
+  // 元の順序でソート（A優先）
   const keyOrder = new Map<string, number>();
-  dataA.rows.forEach((row, i) => keyOrder.set(makeKey(row), i));
+  dataA.rows.forEach((row, i) => keyOrder.set(makeKeyA(row), i));
   dataB.rows.forEach((row, i) => {
-    const k = makeKey(row);
+    const k = makeKeyB(row);
     if (!keyOrder.has(k)) keyOrder.set(k, dataA.rows.length + i);
   });
   diffRows.sort((a, b) => (keyOrder.get(a.key) ?? 0) - (keyOrder.get(b.key) ?? 0));
 
-  return { headers: allHeaders, rows: diffRows, stats };
+  return {
+    headers: allHeaders,
+    rows: diffRows,
+    stats,
+    keyMappings,
+    columnMappings,
+  };
 }
 
-/**
- * DiffResultをExcelファイルとしてエクスポート（ピンク背景付き）
- */
+// ============================
+// Excelエクスポート
+// ============================
+
 export function exportDiffToExcel(
   result: DiffResult,
-  keyColumns: string[],
   fileAName: string,
   fileBName: string
 ): void {
   const workbook = XLSX.utils.book_new();
 
-  // ===== シート1: ファイルAベースの差分表示 =====
-  const wsDataA: unknown[][] = [];
-  wsDataA.push(result.headers); // ヘッダー行
-
+  // 差分行のみシート
+  const wsData: unknown[][] = [result.headers];
   for (const row of result.rows) {
-    if (row.status === "added") continue; // Aにない行はスキップ
-    const rowData = result.headers.map((h) => row.rowA?.[h] ?? "");
-    wsDataA.push(rowData);
+    if (row.status === "same") continue;
+    const rowData = result.headers.map((h) => {
+      const km = result.keyMappings.find((k) => k.colA === h);
+      if (km) return row.rowA?.[km.colA] ?? row.rowB?.[km.colB] ?? "";
+      const cm = result.columnMappings.find((c) => (c.label ?? c.colA) === h);
+      if (!cm) return "";
+      if (row.status === "added") return row.rowB?.[cm.colB] ?? "";
+      if (row.status === "deleted") return row.rowA?.[cm.colA] ?? "";
+      // modified: B側の値を表示
+      return row.rowB?.[cm.colB] ?? "";
+    });
+    wsData.push(rowData);
   }
+  const wsDiff = XLSX.utils.aoa_to_sheet(wsData);
+  XLSX.utils.book_append_sheet(workbook, wsDiff, "差分のみ");
 
-  const wsA = XLSX.utils.aoa_to_sheet(wsDataA);
-
-  // ===== シート2: ファイルBベースの差分表示 =====
-  const wsDataB: unknown[][] = [];
-  wsDataB.push(result.headers);
-
+  // 全行シート（A基準）
+  const wsAllData: unknown[][] = [result.headers];
   for (const row of result.rows) {
-    if (row.status === "deleted") continue; // Bにない行はスキップ
-    const rowData = result.headers.map((h) => row.rowB?.[h] ?? "");
-    wsDataB.push(rowData);
+    const rowData = result.headers.map((h) => {
+      const km = result.keyMappings.find((k) => k.colA === h);
+      if (km) return row.rowA?.[km.colA] ?? row.rowB?.[km.colB] ?? "";
+      const cm = result.columnMappings.find((c) => (c.label ?? c.colA) === h);
+      if (!cm) return "";
+      if (row.status === "added") return `[追加] ${row.rowB?.[cm.colB] ?? ""}`;
+      if (row.status === "deleted") return row.rowA?.[cm.colA] ?? "";
+      return row.rowB?.[cm.colB] ?? "";
+    });
+    wsAllData.push(rowData);
   }
+  const wsAll = XLSX.utils.aoa_to_sheet(wsAllData);
+  XLSX.utils.book_append_sheet(workbook, wsAll, "全行");
 
-  const wsB = XLSX.utils.aoa_to_sheet(wsDataB);
+  // サマリーシート
+  const keyMappingStr = result.keyMappings
+    .map((km) => `${km.colA} ↔ ${km.colB}`)
+    .join(", ");
+  const colMappingStr = result.columnMappings
+    .map((cm) => `${cm.colA} ↔ ${cm.colB}`)
+    .join(", ");
 
-  // ===== シート3: 差分サマリー =====
   const summaryData: unknown[][] = [
     ["比較結果サマリー"],
     [],
     ["ファイルA", fileAName],
     ["ファイルB", fileBName],
-    ["キー列", keyColumns.join(", ")],
+    ["キーマッピング", keyMappingStr],
+    ["列マッピング", colMappingStr],
     [],
     ["ステータス", "件数"],
     ["変更あり", result.stats.modified],
@@ -210,11 +362,10 @@ export function exportDiffToExcel(
     ["Aのみに存在（削除）", result.stats.deleted],
     ["変更なし", result.stats.same],
     ["合計", result.stats.total],
+    [],
+    ["※ 半角・全角は同一視、スペースは無視して比較しています"],
   ];
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-
-  XLSX.utils.book_append_sheet(workbook, wsA, `${fileAName.slice(0, 20)}_差分`);
-  XLSX.utils.book_append_sheet(workbook, wsB, `${fileBName.slice(0, 20)}_差分`);
   XLSX.utils.book_append_sheet(workbook, wsSummary, "比較サマリー");
 
   XLSX.writeFile(workbook, "差分結果.xlsx");
