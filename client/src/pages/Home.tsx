@@ -338,10 +338,14 @@ function DiffTable({
   result,
   showOnlyDiffs,
   hideDeleted,
+  fileAName,
+  fileBName,
 }: {
   result: DiffResult;
   showOnlyDiffs: boolean;
   hideDeleted: boolean;
+  fileAName: string;
+  fileBName: string;
 }) {
   const displayRows = result.rows.filter((r) => {
     if (showOnlyDiffs && r.status === "same") return false;
@@ -397,16 +401,16 @@ function DiffTable({
           <tr>
             {compareLabels.map((h) => (
               <>
-                <th key={`${h}-a`} className="bg-primary/60 text-primary-foreground px-3 py-1.5 text-center text-[10px] font-semibold whitespace-nowrap border-r border-primary/20 w-[1%]">
+                <th key={`${h}-a`} className="bg-primary/60 text-primary-foreground px-3 py-1.5 text-center text-[10px] font-semibold whitespace-nowrap border-r border-primary/20 max-w-[160px]">
                   <span className="inline-flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white/70 inline-block" />
-                    A
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/70 inline-block shrink-0" />
+                    <span className="truncate" title={fileAName}>{fileAName}</span>
                   </span>
                 </th>
-                <th key={`${h}-b`} className="bg-pink-600/80 text-white px-3 py-1.5 text-center text-[10px] font-semibold whitespace-nowrap border-r border-pink-400/30 w-[1%]">
+                <th key={`${h}-b`} className="bg-pink-600/80 text-white px-3 py-1.5 text-center text-[10px] font-semibold whitespace-nowrap border-r border-pink-400/30 max-w-[160px]">
                   <span className="inline-flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white/70 inline-block" />
-                    B
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/70 inline-block shrink-0" />
+                    <span className="truncate" title={fileBName}>{fileBName}</span>
                   </span>
                 </th>
               </>
@@ -1073,7 +1077,13 @@ export default function Home() {
               </div>
 
               <div className="rounded-lg border border-border overflow-hidden shadow-sm">
-                <DiffTable result={diffResult} showOnlyDiffs={showOnlyDiffs} hideDeleted={hideDeleted} />
+                <DiffTable
+                  result={diffResult}
+                  showOnlyDiffs={showOnlyDiffs}
+                  hideDeleted={hideDeleted}
+                  fileAName={fileA.file?.name ?? "ファイルA"}
+                  fileBName={fileB.file?.name ?? "ファイルB"}
+                />
               </div>
             </div>
           )}
