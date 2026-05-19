@@ -610,10 +610,8 @@ export default function Home() {
   const goToStep3 = () => {
     const validKeys = keyMappings.filter((km) => km.colA && km.colB);
     if (validKeys.length === 0) { toast.error("キー列を1つ以上設定してください"); return; }
-    // デフォルト比較列マッピングを生成（キー列を除く）
-    const defaultCols = buildDefaultColumnMappings(fileA.data!.headers, fileB.data!.headers)
-      .filter((cm) => !validKeys.some((km) => km.colA === cm.colA));
-    setColMappings(defaultCols.length > 0 ? defaultCols : [{ colA: "", colB: "", label: "" }]);
+    // 初期は空の1行のみ（ユーザーが追加していく方式）
+    setColMappings([{ colA: "", colB: "", label: "" }]);
     setStep(3);
   };
 
