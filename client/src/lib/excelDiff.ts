@@ -51,21 +51,21 @@ export function parseExcel(buffer: ArrayBuffer, sheetIndex = 0): SheetData {
   }
 
   // ヘッダー行を含む全データをJSON化
-  const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
+  const rawData = XLSX.utils.sheet_to_json(worksheet, {
     header: 1,
     defval: "",
     raw: false,
-  }) as unknown[][];
+  }) as string[][];
 
   if (rawData.length === 0) {
     return { headers: [], rows: [], sheetNames };
   }
 
-  const headers = (rawData[0] as unknown[]).map((h) => String(h ?? "").trim());
+  const headers = rawData[0].map((h) => String(h ?? "").trim());
   const rows: Record<string, string>[] = [];
 
   for (let i = 1; i < rawData.length; i++) {
-    const rawRow = rawData[i] as unknown[];
+    const rawRow = rawData[i] as string[];
     // 全列が空の行はスキップ
     if (rawRow.every((v) => v === "" || v === null || v === undefined)) continue;
     const row: Record<string, string> = {};
@@ -110,12 +110,12 @@ export function compareSheets(
     mapB.set(key, row);
   }
 
-  const allKeys = new Set([...mapA.keys(), ...mapB.keys()]);
+  const allKeys = new Set<string>([...Array.from(mapA.keys()), ...Array.from(mapB.keys())]);
   const diffRows: DiffRow[] = [];
 
   const stats = { total: 0, modified: 0, added: 0, deleted: 0, same: 0 };
 
-  for (const key of allKeys) {
+  for (const key of Array.from(allKeys)) {
     const rowA = mapA.get(key) ?? null;
     const rowB = mapB.get(key) ?? null;
     stats.total++;
