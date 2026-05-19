@@ -297,6 +297,193 @@ export function compareSheets(
 // Excelエクスポート
 // ============================
 
+/** ARGB形式のカラー文字列 */
+const COLOR = {
+  headerBg: "FF3D4A6B",       // インディゴ（ヘッダー背景）
+  headerBgLight: "FF5C6B99",  // 薄インディゴ（比較列グループ）
+  headerBgA: "FF7B8EC0",      // A列サブヘッダー
+  headerBgB: "FFD63384",      // B列サブヘッダー（ピンク）
+  headerFg: "FFFFFFFF",       // ヘッダー文字（白）
+  diffBg: "FFFCE4EC",         // 差分セル背景（ライトピンク）
+  addedBg: "FFE8F5E9",        // 追加行背景（ライトグリーン）
+  deletedBg: "FFFCE4EC",      // 削除行背景（ライトピンク）
+  keyBg: "FF3D4A6B",          // キー列ヘッダー背景
+  statusBg: "FF3D4A6B",       // 状態列ヘッダー背景
+  white: "FFFFFFFF",
+  black: "FF000000",
+};
+
+function cellStyle(opts: {
+  bgColor?: string;
+  fgColor?: string;
+  bold?: boolean;
+  strike?: boolean;
+  wrapText?: boolean;
+  hAlign?: "left" | "center" | "right";
+}) {
+  return {
+    fill: opts.bgColor ? { patternType: "solid", fgColor: { rgb: opts.bgColor } } : undefined,
+    font: {
+      color: opts.fgColor ? { rgb: opts.fgColor } : undefined,
+      bold: opts.bold ?? false,
+      strike: opts.strike ?? false,
+    },
+    alignment: {
+      horizontal: opts.hAlign ?? "left",
+      vertical: "center",
+      wrapText: opts.wrapText ?? false,
+    },
+    border: {
+      top:    { style: "thin", color: { rgb: "FFD0D0D0" } },
+      bottom: { style: "thin", color: { rgb: "FFD0D0D0" } },
+      left:   { style: "thin", color: { rgb: "FFD0D0D0" } },
+      right:  { style: "thin", color: { rgb: "FFD0D0D0" } },
+    },
+  };
+}
+
+function setCellAt(
+  ws: XLSX.WorkSheet,
+  r: number,
+  c: number,
+  value: string | number,
+  style: ReturnType<typeof cellStyle>
+) {
+  const addr = XLSX.utils.encode_cell({ r, c });
+  ws[addr] = { v: value, t: typeof value === "number" ? "n" : "s", s: style };
+}
+
+function buildDiffSheet(
+  result: DiffResult,
+  fileAName: string,
+  fileBName: string,
+  onlyDiffs: boolean
+): XLSX.WorkSheet {
+  const ws: XLSX.WorkSheet = {};
+
+  const keyLabels = result.keyMappings.map((km) => km.colA);
+  const compareMappings = result.columnMappings.filter(
+    (cm) => !result.keyMappings.some((km) => km.colA === cm.colA)
+  );
+
+  // ---- 列インデックス計算 ----
+  // 状態(1) + キー列(n) + 比較列×2(m*2)
+  const statusCol = 0;
+  const keyStartCol = 1;
+  const compareStartCol = keyStartCol + keyLabels.length;
+
+  // ---- 行1: グループヘッダー ----
+  // 状態列（rowSpan=2 → 結合）
+  setCellAt(ws, 0, statusCol, "状態", cellStyle({ bgColor: COLOR.headerBg, fgColor: COLOR.headerFg, bold: true, hAlign: "center" }));
+  // キー列（rowSpan=2 → 結合）
+  keyLabels.forEach((h, i) => {
+    setCellAt(ws, 0, keyStartCol + i, `${h} [KEY]`, cellStyle({ bgColor: COLOR.headerBg, fgColor: COLOR.headerFg, bold: true }));
+  });
+  // 比較列グループ（列名 + colSpan=2）
+  compareMappings.forEach((cm, i) => {
+    const col = compareStartCol + i * 2;
+    const label = cm.label ?? cm.colA;
+    setCellAt(ws, 0, col, label, cellStyle({ bgColor: COLOR.headerBgLight, fgColor: COLOR.headerFg, bold: true, hAlign: "center" }));
+    setCellAt(ws, 0, col + 1, "", cellStyle({ bgColor: COLOR.headerBgLight, fgColor: COLOR.headerFg, bold: true }));
+  });
+
+  // ---- 行2: ファイル名サブヘッダー ----
+  setCellAt(ws, 1, statusCol, "", cellStyle({ bgColor: COLOR.headerBg, fgColor: COLOR.headerFg }));
+  keyLabels.forEach((_, i) => {
+    setCellAt(ws, 1, keyStartCol + i, "", cellStyle({ bgColor: COLOR.headerBg, fgColor: COLOR.headerFg }));
+  });
+  compareMappings.forEach((_, i) => {
+    const col = compareStartCol + i * 2;
+    setCellAt(ws, 1, col,     fileAName, cellStyle({ bgColor: COLOR.headerBgA, fgColor: COLOR.headerFg, bold: true, hAlign: "center" }));
+    setCellAt(ws, 1, col + 1, fileBName, cellStyle({ bgColor: COLOR.headerBgB, fgColor: COLOR.headerFg, bold: true, hAlign: "center" }));
+  });
+
+  // ---- セル結合 ----
+  const merges: XLSX.Range[] = [];
+  // 状態列: 行1-2結合
+  merges.push({ s: { r: 0, c: statusCol }, e: { r: 1, c: statusCol } });
+  // キー列: 行1-2結合
+  keyLabels.forEach((_, i) => {
+    merges.push({ s: { r: 0, c: keyStartCol + i }, e: { r: 1, c: keyStartCol + i } });
+  });
+  // 比較列グループ: 列2つ結合
+  compareMappings.forEach((_, i) => {
+    const col = compareStartCol + i * 2;
+    merges.push({ s: { r: 0, c: col }, e: { r: 0, c: col + 1 } });
+  });
+  ws["!merges"] = merges;
+
+  // ---- データ行 ----
+  let rowIdx = 2;
+  const rows = onlyDiffs
+    ? result.rows.filter((r) => r.status !== "same")
+    : result.rows;
+
+  for (const row of rows) {
+    const isAdded = row.status === "added";
+    const isDeleted = row.status === "deleted";
+    const isModified = row.status === "modified";
+    const rowBg = isAdded ? COLOR.addedBg : isDeleted ? COLOR.deletedBg : undefined;
+    const diffCols = new Set(row.diffs.map((d) => d.col));
+
+    // 状態
+    const statusLabel = isAdded ? "追加" : isDeleted ? "削除" : isModified ? "変更" : "同一";
+    const statusBg = isAdded ? "FF4CAF50" : isDeleted ? "FFE91E63" : isModified ? "FFE91E63" : "FF9E9E9E";
+    setCellAt(ws, rowIdx, statusCol, statusLabel, cellStyle({ bgColor: statusBg, fgColor: COLOR.white, bold: true, hAlign: "center" }));
+
+    // キー列
+    keyLabels.forEach((h, i) => {
+      const km = result.keyMappings.find((k) => k.colA === h);
+      const val = km ? (row.rowA?.[km.colA] ?? row.rowB?.[km.colB] ?? "") : "";
+      setCellAt(ws, rowIdx, keyStartCol + i, val, cellStyle({ bgColor: rowBg, bold: true }));
+    });
+
+    // 比較列（A列・B列横並び）
+    compareMappings.forEach((cm, i) => {
+      const col = compareStartCol + i * 2;
+      const label = cm.label ?? cm.colA;
+      const isDiff = diffCols.has(label);
+      const valA = row.rowA?.[cm.colA] ?? "";
+      const valB = row.rowB?.[cm.colB] ?? "";
+      const cellBgA = isDiff ? COLOR.diffBg : rowBg;
+      const cellBgB = isDiff ? COLOR.diffBg : rowBg;
+
+      if (isAdded) {
+        setCellAt(ws, rowIdx, col,     "–", cellStyle({ bgColor: rowBg }));
+        setCellAt(ws, rowIdx, col + 1, valB, cellStyle({ bgColor: rowBg }));
+      } else if (isDeleted) {
+        setCellAt(ws, rowIdx, col,     valA, cellStyle({ bgColor: cellBgA, strike: true }));
+        setCellAt(ws, rowIdx, col + 1, "–",  cellStyle({ bgColor: rowBg }));
+      } else {
+        // same or modified
+        setCellAt(ws, rowIdx, col,     valA, cellStyle({ bgColor: cellBgA, strike: isDiff }));
+        setCellAt(ws, rowIdx, col + 1, valB, cellStyle({ bgColor: cellBgB }));
+      }
+    });
+
+    rowIdx++;
+  }
+
+  // ---- 列幅設定 ----
+  const totalCols = compareStartCol + compareMappings.length * 2;
+  const colWidths: { wch: number }[] = [];
+  colWidths.push({ wch: 8 }); // 状態
+  keyLabels.forEach(() => colWidths.push({ wch: 18 }));
+  compareMappings.forEach(() => {
+    colWidths.push({ wch: 24 });
+    colWidths.push({ wch: 24 });
+  });
+  ws["!cols"] = colWidths;
+
+  // ---- シート範囲 ----
+  ws["!ref"] = XLSX.utils.encode_range({
+    s: { r: 0, c: 0 },
+    e: { r: rowIdx - 1, c: totalCols - 1 },
+  });
+
+  return ws;
+}
+
 export function exportDiffToExcel(
   result: DiffResult,
   fileAName: string,
@@ -305,39 +492,11 @@ export function exportDiffToExcel(
   const workbook = XLSX.utils.book_new();
 
   // 差分行のみシート
-  const wsData: unknown[][] = [result.headers];
-  for (const row of result.rows) {
-    if (row.status === "same") continue;
-    const rowData = result.headers.map((h) => {
-      const km = result.keyMappings.find((k) => k.colA === h);
-      if (km) return row.rowA?.[km.colA] ?? row.rowB?.[km.colB] ?? "";
-      const cm = result.columnMappings.find((c) => (c.label ?? c.colA) === h);
-      if (!cm) return "";
-      if (row.status === "added") return row.rowB?.[cm.colB] ?? "";
-      if (row.status === "deleted") return row.rowA?.[cm.colA] ?? "";
-      // modified: B側の値を表示
-      return row.rowB?.[cm.colB] ?? "";
-    });
-    wsData.push(rowData);
-  }
-  const wsDiff = XLSX.utils.aoa_to_sheet(wsData);
+  const wsDiff = buildDiffSheet(result, fileAName, fileBName, true);
   XLSX.utils.book_append_sheet(workbook, wsDiff, "差分のみ");
 
-  // 全行シート（A基準）
-  const wsAllData: unknown[][] = [result.headers];
-  for (const row of result.rows) {
-    const rowData = result.headers.map((h) => {
-      const km = result.keyMappings.find((k) => k.colA === h);
-      if (km) return row.rowA?.[km.colA] ?? row.rowB?.[km.colB] ?? "";
-      const cm = result.columnMappings.find((c) => (c.label ?? c.colA) === h);
-      if (!cm) return "";
-      if (row.status === "added") return `[追加] ${row.rowB?.[cm.colB] ?? ""}`;
-      if (row.status === "deleted") return row.rowA?.[cm.colA] ?? "";
-      return row.rowB?.[cm.colB] ?? "";
-    });
-    wsAllData.push(rowData);
-  }
-  const wsAll = XLSX.utils.aoa_to_sheet(wsAllData);
+  // 全行シート
+  const wsAll = buildDiffSheet(result, fileAName, fileBName, false);
   XLSX.utils.book_append_sheet(workbook, wsAll, "全行");
 
   // サマリーシート
