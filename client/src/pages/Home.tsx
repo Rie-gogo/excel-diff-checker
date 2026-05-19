@@ -332,7 +332,7 @@ function MappingRow({
 }
 
 // ============================
-// 差分結果テーブル
+// 差分結果テーブル（A列・B列横並び表示）
 // ============================
 function DiffTable({
   result,
@@ -346,6 +346,8 @@ function DiffTable({
     : result.rows;
 
   const keyLabels = result.keyMappings.map((km) => km.colA);
+  // 比較列のみ（キー列を除く）
+  const compareLabels = result.headers.filter((h) => !keyLabels.includes(h));
 
   if (displayRows.length === 0) {
     return (
@@ -362,23 +364,48 @@ function DiffTable({
       <table className="data-table w-full border-collapse text-sm">
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 bg-primary text-primary-foreground px-3 py-2 text-left text-xs font-semibold whitespace-nowrap border-r border-primary/30">
+            {/* 状態列 */}
+            <th className="sticky left-0 z-10 bg-primary text-primary-foreground px-3 py-2 text-left text-xs font-semibold whitespace-nowrap border-r border-primary/30" rowSpan={2}>
               状態
             </th>
-            {result.headers.map((h) => (
+            {/* キー列（1行ヘッダー） */}
+            {keyLabels.map((h) => (
               <th
                 key={h}
-                className={`px-3 py-2 text-left text-xs font-semibold whitespace-nowrap border-r border-border/50 last:border-r-0 ${
-                  keyLabels.includes(h)
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-primary/80 text-primary-foreground"
-                }`}
+                rowSpan={2}
+                className="bg-primary text-primary-foreground px-3 py-2 text-left text-xs font-semibold whitespace-nowrap border-r border-primary/30"
               >
                 {h}
-                {keyLabels.includes(h) && (
-                  <span className="ml-1 text-[10px] opacity-70">[KEY]</span>
-                )}
+                <span className="ml-1 text-[10px] opacity-70">[KEY]</span>
               </th>
+            ))}
+            {/* 比較列グループヘッダー（列名 + A/B サブヘッダー） */}
+            {compareLabels.map((h) => (
+              <th
+                key={h}
+                colSpan={2}
+                className="bg-primary/80 text-primary-foreground px-3 py-2 text-center text-xs font-semibold whitespace-nowrap border-r border-primary/20"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+          <tr>
+            {compareLabels.map((h) => (
+              <>
+                <th key={`${h}-a`} className="bg-primary/60 text-primary-foreground px-3 py-1.5 text-center text-[10px] font-semibold whitespace-nowrap border-r border-primary/20 w-[1%]">
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/70 inline-block" />
+                    A
+                  </span>
+                </th>
+                <th key={`${h}-b`} className="bg-pink-600/80 text-white px-3 py-1.5 text-center text-[10px] font-semibold whitespace-nowrap border-r border-pink-400/30 w-[1%]">
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/70 inline-block" />
+                    B
+                  </span>
+                </th>
+              </>
             ))}
           </tr>
         </thead>
@@ -392,18 +419,22 @@ function DiffTable({
                   <td className="sticky left-0 z-10 px-3 py-2 whitespace-nowrap bg-emerald-100 border-r border-border/30">
                     <Badge className="bg-emerald-500 text-white text-[10px] px-1.5 py-0">追加</Badge>
                   </td>
-                  {result.headers.map((h) => {
+                  {keyLabels.map((h) => {
                     const km = result.keyMappings.find((k) => k.colA === h);
-                    const cm = result.columnMappings.find((c) => (c.label ?? c.colA) === h);
-                    const val = km
-                      ? (row.rowB?.[km.colB] ?? "")
-                      : cm
-                      ? (row.rowB?.[cm.colB] ?? "")
-                      : "";
                     return (
-                      <td key={h} className="px-3 py-2 whitespace-nowrap border-r border-border/30 last:border-r-0">
-                        {val}
+                      <td key={h} className="px-3 py-2 whitespace-nowrap border-r border-border/30 font-medium">
+                        {km ? (row.rowB?.[km.colB] ?? "") : ""}
                       </td>
+                    );
+                  })}
+                  {compareLabels.map((h) => {
+                    const cm = result.columnMappings.find((c) => (c.label ?? c.colA) === h);
+                    const valB = cm ? (row.rowB?.[cm.colB] ?? "") : "";
+                    return (
+                      <>
+                        <td key={`${h}-a`} className="px-3 py-2 whitespace-nowrap border-r border-border/20 text-muted-foreground/50 text-xs italic">—</td>
+                        <td key={`${h}-b`} className="px-3 py-2 whitespace-nowrap border-r border-border/30 bg-emerald-50 text-emerald-800">{valB}</td>
+                      </>
                     );
                   })}
                 </tr>
@@ -416,18 +447,22 @@ function DiffTable({
                   <td className="sticky left-0 z-10 px-3 py-2 whitespace-nowrap bg-rose-100 border-r border-border/30">
                     <Badge className="bg-rose-500 text-white text-[10px] px-1.5 py-0">削除</Badge>
                   </td>
-                  {result.headers.map((h) => {
+                  {keyLabels.map((h) => {
                     const km = result.keyMappings.find((k) => k.colA === h);
-                    const cm = result.columnMappings.find((c) => (c.label ?? c.colA) === h);
-                    const val = km
-                      ? (row.rowA?.[km.colA] ?? "")
-                      : cm
-                      ? (row.rowA?.[cm.colA] ?? "")
-                      : "";
                     return (
-                      <td key={h} className="px-3 py-2 whitespace-nowrap border-r border-border/30 last:border-r-0">
-                        {val}
+                      <td key={h} className="px-3 py-2 whitespace-nowrap border-r border-border/30 font-medium">
+                        {km ? (row.rowA?.[km.colA] ?? "") : ""}
                       </td>
+                    );
+                  })}
+                  {compareLabels.map((h) => {
+                    const cm = result.columnMappings.find((c) => (c.label ?? c.colA) === h);
+                    const valA = cm ? (row.rowA?.[cm.colA] ?? "") : "";
+                    return (
+                      <>
+                        <td key={`${h}-a`} className="px-3 py-2 whitespace-nowrap border-r border-border/20 bg-rose-50 text-rose-800">{valA}</td>
+                        <td key={`${h}-b`} className="px-3 py-2 whitespace-nowrap border-r border-border/30 text-muted-foreground/50 text-xs italic">—</td>
+                      </>
                     );
                   })}
                 </tr>
@@ -440,7 +475,7 @@ function DiffTable({
               <tr
                 key={ri}
                 className={`border-b border-border/30 transition-colors ${
-                  hasDiff ? "hover:bg-pink-50/50" : "hover:bg-muted/30"
+                  hasDiff ? "hover:bg-pink-50/30" : "hover:bg-muted/20"
                 }`}
               >
                 <td className="sticky left-0 z-10 px-3 py-2 whitespace-nowrap bg-background border-r border-border/30">
@@ -450,40 +485,47 @@ function DiffTable({
                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0">同一</Badge>
                   )}
                 </td>
-                {result.headers.map((h) => {
-                  const isDiff = diffCols.has(h);
+                {/* キー列 */}
+                {keyLabels.map((h) => {
                   const km = result.keyMappings.find((k) => k.colA === h);
+                  return (
+                    <td key={h} className="px-3 py-2 whitespace-nowrap border-r border-border/30 font-medium">
+                      {km ? (row.rowA?.[km.colA] ?? "") : ""}
+                    </td>
+                  );
+                })}
+                {/* 比較列: A列・B列を横並び */}
+                {compareLabels.map((h) => {
+                  const isDiff = diffCols.has(h);
                   const cm = result.columnMappings.find((c) => (c.label ?? c.colA) === h);
-
-                  // キー列はAの値を表示
-                  if (km) {
-                    const val = row.rowA?.[km.colA] ?? "";
-                    return (
-                      <td key={h} className="px-3 py-2 whitespace-nowrap border-r border-border/30 last:border-r-0 font-medium">
-                        {val}
-                      </td>
-                    );
-                  }
-
-                  const diffInfo = row.diffs.find((d) => d.col === h);
                   const valA = cm ? (row.rowA?.[cm.colA] ?? "") : "";
                   const valB = cm ? (row.rowB?.[cm.colB] ?? "") : "";
 
                   return (
-                    <td
-                      key={h}
-                      className={`px-3 py-2 whitespace-nowrap border-r border-border/30 last:border-r-0 ${isDiff ? "diff-cell" : ""}`}
-                      title={isDiff && diffInfo ? `A: ${diffInfo.valueA} → B: ${diffInfo.valueB}` : undefined}
-                    >
-                      {isDiff ? (
-                        <span className="flex flex-col gap-0.5">
-                          <span className="line-through opacity-50 text-xs">{valA || "(空)"}</span>
-                          <span>{valB || "(空)"}</span>
-                        </span>
-                      ) : (
-                        valA
-                      )}
-                    </td>
+                    <>
+                      {/* A列セル */}
+                      <td
+                        key={`${h}-a`}
+                        className={`px-3 py-2 whitespace-nowrap border-r border-border/20 ${
+                          isDiff ? "bg-[#FFD6E7] text-[#8B0038]" : ""
+                        }`}
+                      >
+                        {isDiff ? (
+                          <span className="line-through opacity-60 text-xs">{valA || "(空)"}</span>
+                        ) : (
+                          valA
+                        )}
+                      </td>
+                      {/* B列セル */}
+                      <td
+                        key={`${h}-b`}
+                        className={`px-3 py-2 whitespace-nowrap border-r border-border/30 ${
+                          isDiff ? "bg-[#FFD6E7] text-[#8B0038] font-semibold" : "text-muted-foreground/70"
+                        }`}
+                      >
+                        {valB || (isDiff ? "(空)" : "")}
+                      </td>
+                    </>
                   );
                 })}
               </tr>
@@ -1005,7 +1047,7 @@ export default function Home() {
               {/* 凡例 */}
               <div className="flex items-center gap-4 mb-3 text-xs text-muted-foreground">
                 <span className="font-medium">凡例:</span>
-                <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-[#FFD6E7]" />変更セル（ピンク）</span>
+                <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-[#FFD6E7]" />変更セル（ピンク）— 左:A値（取り消し線）/ 右:B値</span>
                 <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-emerald-100" />追加行</span>
                 <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-rose-100" />削除行</span>
               </div>
