@@ -367,8 +367,34 @@ function DiffTable({
     );
   }
 
+  const topScrollRef = React.useRef<HTMLDivElement>(null);
+  const bottomScrollRef = React.useRef<HTMLDivElement>(null);
+  useTopScrollSync(topScrollRef, bottomScrollRef);
+
+  const syncFromTop = () => {
+    if (bottomScrollRef.current && topScrollRef.current) {
+      bottomScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    }
+  };
+  const syncFromBottom = () => {
+    if (topScrollRef.current && bottomScrollRef.current) {
+      topScrollRef.current.scrollLeft = bottomScrollRef.current.scrollLeft;
+    }
+  };
+
   return (
-    <div className="overflow-auto">
+    <div>
+      {/* 上部スクロールバー（ミラー） */}
+      <div
+        ref={topScrollRef}
+        onScroll={syncFromTop}
+        className="overflow-x-auto overflow-y-hidden"
+        style={{ height: "12px" }}
+      >
+        <div style={{ height: "1px" }} className="top-scroll-inner" />
+      </div>
+      {/* 本体テーブル */}
+      <div ref={bottomScrollRef} onScroll={syncFromBottom} className="overflow-auto">
       <table className="data-table w-full border-collapse text-sm">
         <thead>
           <tr>
@@ -541,8 +567,28 @@ function DiffTable({
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
+}
+
+// top-scroll-inner の幅をテーブルの実幅に合わせる
+function useTopScrollSync(
+  topRef: React.RefObject<HTMLDivElement | null>,
+  bottomRef: React.RefObject<HTMLDivElement | null>,
+) {
+  React.useEffect(() => {
+    const bottom = bottomRef.current;
+    if (!bottom) return;
+    const update = () => {
+      const inner = topRef.current?.querySelector<HTMLDivElement>(".top-scroll-inner");
+      if (inner) inner.style.width = bottom.scrollWidth + "px";
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(bottom);
+    return () => ro.disconnect();
+  }, [topRef, bottomRef]);
 }
 
 // ============================
