@@ -574,8 +574,8 @@ function DiffTable({
 
 // top-scroll-inner の幅をテーブルの実幅に合わせる
 function useTopScrollSync(
-  topRef: ReturnType<typeof useRef<HTMLDivElement>>,
-  bottomRef: ReturnType<typeof useRef<HTMLDivElement>>,
+  topRef: { current: HTMLDivElement | null },
+  bottomRef: { current: HTMLDivElement | null },
 ) {
   useEffect(() => {
     const bottom = bottomRef.current;
