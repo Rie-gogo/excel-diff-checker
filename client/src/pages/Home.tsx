@@ -401,16 +401,16 @@ function DiffTable({
           <tr>
             {compareLabels.map((h) => (
               <>
-                <th key={`${h}-a`} className="bg-primary/60 text-primary-foreground px-3 py-1.5 text-center text-[10px] font-semibold whitespace-nowrap border-r border-primary/20 max-w-[160px]">
-                  <span className="inline-flex items-center gap-1">
+                <th key={`${h}-a`} className="bg-primary/60 text-primary-foreground px-2 py-1.5 text-center text-[10px] font-semibold border-r border-primary/20" style={{maxWidth: "140px", width: "140px", overflow: "hidden"}}>
+                  <span className="flex items-center gap-1 overflow-hidden">
                     <span className="w-1.5 h-1.5 rounded-full bg-white/70 inline-block shrink-0" />
-                    <span className="truncate" title={fileAName}>{fileAName}</span>
+                    <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={fileAName}>{fileAName}</span>
                   </span>
                 </th>
-                <th key={`${h}-b`} className="bg-pink-600/80 text-white px-3 py-1.5 text-center text-[10px] font-semibold whitespace-nowrap border-r border-pink-400/30 max-w-[160px]">
-                  <span className="inline-flex items-center gap-1">
+                <th key={`${h}-b`} className="bg-pink-600/80 text-white px-2 py-1.5 text-center text-[10px] font-semibold border-r border-pink-400/30" style={{maxWidth: "140px", width: "140px", overflow: "hidden"}}>
+                  <span className="flex items-center gap-1 overflow-hidden">
                     <span className="w-1.5 h-1.5 rounded-full bg-white/70 inline-block shrink-0" />
-                    <span className="truncate" title={fileBName}>{fileBName}</span>
+                    <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={fileBName}>{fileBName}</span>
                   </span>
                 </th>
               </>
