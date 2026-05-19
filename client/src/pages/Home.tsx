@@ -10,7 +10,7 @@
  * 正規化: 半角/全角同一視、スペース（半角・全角）無視
  */
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   parseExcel,
   compareSheets,
@@ -367,8 +367,8 @@ function DiffTable({
     );
   }
 
-  const topScrollRef = React.useRef<HTMLDivElement>(null);
-  const bottomScrollRef = React.useRef<HTMLDivElement>(null);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const bottomScrollRef = useRef<HTMLDivElement>(null);
   useTopScrollSync(topScrollRef, bottomScrollRef);
 
   const syncFromTop = () => {
@@ -574,10 +574,10 @@ function DiffTable({
 
 // top-scroll-inner の幅をテーブルの実幅に合わせる
 function useTopScrollSync(
-  topRef: React.RefObject<HTMLDivElement | null>,
-  bottomRef: React.RefObject<HTMLDivElement | null>,
+  topRef: ReturnType<typeof useRef<HTMLDivElement>>,
+  bottomRef: ReturnType<typeof useRef<HTMLDivElement>>,
 ) {
-  React.useEffect(() => {
+  useEffect(() => {
     const bottom = bottomRef.current;
     if (!bottom) return;
     const update = () => {
