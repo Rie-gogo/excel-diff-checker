@@ -7,6 +7,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
+    <!-- PWA -->
+    <link rel="manifest" href="/excel-diff-checker/manifest.json" />
+    <meta name="theme-color" content="#1e2a4a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="差分チェッカー" />
+    <link rel="apple-touch-icon" href="/excel-diff-checker/icons/icon-192x192.png" />
   </head>
   <body>
     <div id="root"></div>
@@ -15,5 +23,15 @@
       defer
       src="%VITE_ANALYTICS_ENDPOINT%/umami"
       data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
+    <!-- Service Worker 登録 -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/excel-diff-checker/sw.js', { scope: '/excel-diff-checker/' })
+            .then(function(reg) { console.log('SW registered:', reg.scope); })
+            .catch(function(err) { console.warn('SW registration failed:', err); });
+        });
+      }
+    </script>
   </body>
 </html>

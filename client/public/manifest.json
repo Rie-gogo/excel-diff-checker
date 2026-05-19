@@ -1,0 +1,27 @@
+{
+  "name": "Excel差分チェッカー",
+  "short_name": "差分チェッカー",
+  "description": "2つのExcelファイルを比較し、差分をハイライト表示するツール",
+  "start_url": "/excel-diff-checker/",
+  "scope": "/excel-diff-checker/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f8f7f4",
+  "theme_color": "#1e2a4a",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "/excel-diff-checker/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/excel-diff-checker/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"]
+}
