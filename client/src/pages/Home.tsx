@@ -976,7 +976,7 @@ export default function Home() {
                           headersB={headersB.filter((h) => !usedKeyB.has(h))}
                           usedA={new Set(colMappings.filter((_, j) => j !== i).map((c) => c.colA).filter(Boolean))}
                           usedB={new Set(colMappings.filter((_, j) => j !== i).map((c) => c.colB).filter(Boolean))}
-                          onChangeA={(v) => setColMappings(colMappings.map((c, j) => j === i ? { ...c, colA: v, label: "" } : c))}
+                          onChangeA={(v) => setColMappings(colMappings.map((c, j) => j === i ? { ...c, colA: v, label: v } : c))}
                           onChangeB={(v) => setColMappings(colMappings.map((c, j) => j === i ? { ...c, colB: v } : c))}
                           onRemove={() => setColMappings(colMappings.filter((_, j) => j !== i))}
                           canRemove={colMappings.length > 1}
@@ -986,7 +986,7 @@ export default function Home() {
                       <div className="w-28 shrink-0 mt-5">
                         <input
                           type="text"
-                          value={cm.label !== undefined && cm.label !== "" ? cm.label : cm.colA}
+                          value={cm.label ?? cm.colA}
                           onChange={(e) => setColMappings(colMappings.map((c, j) => j === i ? { ...c, label: e.target.value } : c))}
                           placeholder={cm.colA || "表示名"}
                           className="w-full text-xs border border-input rounded px-2 py-1.5 bg-background font-mono"
